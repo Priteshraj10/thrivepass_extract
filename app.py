@@ -10,7 +10,6 @@ import re
 import os
 import codecs
 import io
-from matplotlib import pyplot as plt
 import plotly.graph_objects as go
 
 image = Image.open('assets/tp logo day.png')
@@ -20,8 +19,16 @@ st.image('assets/tp-wordmark-day.png', width=400)
 
 uploaded_file = st.file_uploader("Choose a file")
 if uploaded_file is not None:
-    df = pd.read_excel(uploaded_file, skiprows=1)
+    df = pd.read_excel(uploaded_file)
 
+    # create a function for new header for the dataframe
+    def new_header(df):
+        new_header = df.iloc[0]  # grab the first row for the header
+        df = df[1:]  # take the data less the header row
+        df.columns = new_header  # set the header row as the df header
+        return df
+
+    df = new_header(df)
     # str contains method
     mask = df[df['MemberID'].str.contains(r"MemberID", na=False)]
 
@@ -29,60 +36,51 @@ if uploaded_file is not None:
     indexes = mask.index.values
 
     # member information dataframe
-    inital_val = 0
-    member_df = df.loc[0:indexes[0] - 3]
-    st.subheader('Member Information')
-    st.write(member_df)
+    member_df = df.iloc[0:indexes[0] - 3]
 
-    plan_df = df.iloc[indexes[0]:indexes[1] - 2]
-    st.subheader('Plan Information')
-    st.write(plan_df)
-    final_df = pd.merge(plan_df, member_df, on='MemberID', suffixes=('', '_delme'))
-    final_df = final_df[[c for c in final_df.columns if not c.endswith('_delme')]]
+    # plan information dataframe
+    plan_df = df.iloc[indexes[0] - 1:indexes[1] - 3]
+    plan_df = new_header(plan_df)
 
+    final_df = pd.merge(plan_df, member_df, on='MemberID', how='inner')
 
+    # sort by memberid
+    final_df = final_df.sort_values(by=['MemberID'])
 
-    dependent_df = df.iloc[indexes[4]:]
-    st.subheader('Dependent Information')
-    st.write(dependent_df)
+    final_df.columns = final_df.columns.fillna('to_drop')
+    final_df.drop('to_drop', axis=1, inplace=True)
+    final_df = final_df.astype(str)
+
+    # Dependent And Dependent Plan Information
+    dependent_df = df.iloc[indexes[4] - 1:]
+    dependent_df = new_header(dependent_df)
+    dependent_df.columns = dependent_df.columns.fillna('to_drop')
+    dependent_df.drop('to_drop', axis=1, inplace=True)
+    dependent_df = dependent_df.astype(str)
 
     # -----Sidebar filter Member Information-----
-    st.sidebar.subheader('Please filter here')
-    if st.sidebar.checkbox('Member Information'):
-        Program = st.sidebar.multiselect('Select Benefit Program', options=final_df.ClientDivisionName.unique())
-        sp_info = st.sidebar.multiselect('Select Coverage Level', options=final_df.CoverageLevelTypeDesc.unique())
-        plan = st.sidebar.multiselect('Select Plan Type:', options=final_df.PlanName.unique())
-        desc = st.sidebar.multiselect('Select Plan Description:', options=final_df.StatusDesc.unique())
-        carrier = st.sidebar.multiselect('Select Carrier:', options=final_df.CarrierName.unique())
-        final_df = final_df.query(
-            f"ClientDivisionName == @Program" and "CoverageLevelTypeDesc == @sp_info" and "StatusDesc == @desc" and "CarrierName == @carrier" and "PlanName == @plan")
-        st.subheader('Member information and Plan information')
-        st.write(final_df)
+    st.sidebar.header('Please filter here:')
+    st.sidebar.header('Member Information')
+    Program = st.sidebar.multiselect('Select Benefit Program', options=final_df.ClientDivisionName.unique())
+    sp_info = st.sidebar.multiselect('Select Coverage Level', options=final_df.CoverageLevelTypeDesc.unique())
+    plan = st.sidebar.multiselect('Select Plan Type:', options=final_df.PlanName.unique())
+    desc = st.sidebar.multiselect('Select Plan Description:', options=final_df.StatusDesc.unique())
+    carrier = st.sidebar.multiselect('Select Carrier:', options=final_df.CarrierName.unique())
+    final_df = final_df.query(
+        f"ClientDivisionName == @Program" or "CoverageLevelTypeDesc == @sp_info" or "StatusDesc == @desc" or "CarrierName == @carrier" or "PlanName == @plan")
+    st.write(final_df)
 
-    elif st.sidebar.checkbox('Dependent Information'):
-        st.write(dependent_df)
-
+    # -----Sidebar filter Plan Information-----
+    st.sidebar.header('Dependent information')
+    Plan_name = st.sidebar.multiselect('Select Plan Name:', options=dependent_df.PlanName.unique())
+    insur_type = st.sidebar.multiselect('Select Insurance Type:', options=dependent_df.InsuranceTypeName.unique())
+    state = st.sidebar.multiselect('Select State:', options=dependent_df.StateOrProvince.unique())
+    Country = st.sidebar.multiselect('Select County:', options=dependent_df.Country.unique())
+    dependent_df = dependent_df.query(f"PlanName == @Plan_name" or "InsuranceTypeName == @insur_type" or "StateOrProvince == @state" or "Country == @Country")
+    st.sidebar.header('Dependent Information')
+    st.write(dependent_df)
 
 """
-  # ---- SIDEBAR ----
-  st.sidebar.header("Please Filter Here:")
-
-  Program = st.sidebar.multiselect(
-      "Select the Benefit program:",
-      options=final_df["ClientDivisionName"].unique()
-  )
-
-  sp_info = st.sidebar.multiselect(
-      "Select the Coverage Level:",
-      options=final_df["ClientDivisionID"].unique()
-  )
-
-
-  desc = st.sidebar.multiselect(
-      "Select the Status:",
-      options=final_df["StatusDesc"].unique()
-  )
-
   no_days = st.sidebar.radio(label='Radio buttons', options=['60 days before', '60 days after'])
 
   if no_days == '60 days before':
@@ -103,7 +101,7 @@ if uploaded_file is not None:
   st.header("Ecolab")
   st.write(final_df)
 
-
+"""
 
 def age(born):
     born = datetime.strptime(str(born), "%Y-%m-%d %H-%m-%s").date()
@@ -115,7 +113,7 @@ def age(born):
 def addYears(d, years):
     year=d.year+years
     return year
-"""
+
 
 def download_button(object_to_download, download_filename, button_text, pickle_it=False):
     if pickle_it:

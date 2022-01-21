@@ -3,33 +3,50 @@ import openpyxl
 from datetime import datetime, date
 
 df = pd.read_excel('data/orignal_testing_data/QB Summary 2021.11.10 raw-test.xlsx')
+"""
+# new header for the dataframe
+new_header = df.iloc[0] #grab the first row for the header
+df = df[1:] #take the data less the header row
+df.columns = new_header #set the header row as the df header
+"""
+
+# create a function for new header for the dataframe
+def new_header(df):
+    new_header = df.iloc[0] #grab the first row for the header
+    df = df[1:] #take the data less the header row
+    df.columns = new_header #set the header row as the df header
+    return df
+
+df = new_header(df)
 
 # str contains method
-mask = df[df['Member Information'].str.contains(r"MemberID", na=False)]
+mask = df[df['MemberID'].str.contains(r"MemberID", na=False)]
 
 # indexes of mask
 indexes = mask.index.values
 
 # member information dataframe
-member_df = df.iloc[indexes[0]:indexes[1]-3]
-print(member_df)
+member_df = df.iloc[0:indexes[0]-3]
 
 # plan information dataframe
-plan_df = df.iloc[indexes[1]:indexes[2]-3]
-#print(plan_df)
+plan_df = df.iloc[indexes[0]-1:indexes[1]-3]
+plan_df = new_header(plan_df)
 
-# sort dataframe by MemberID
-# member_df = member_df.sort_values(by=['MemberID'])
+"""
+# payment information dataframe
+pay_df = df.iloc[indexes[1]-1:indexes[2]-3]
+pay_df = new_header(pay_df)
+print(member_df)
+"""
 
-# concat member_df and plan_df
-# final_df = pd.concat([plan_df, member_df], keys=['MemberID'])
-# final_df = pd.merge(plan_df,member_df,on='MemberID', how='inner')
+final_df = pd.merge(plan_df,member_df,on='MemberID', how='inner')
 
-# Final dataframe
-# final_df = pd.merge(plan_df,member_df,sort=True,on='MemberID', suffixes=('', '_delme'), how='outer')
-# final_df = final_df[[c for c in final_df.columns if not c.endswith('_delme')]]
+# sort by memberid
+final_df = final_df.sort_values(by=['MemberID'])
 
-# print(final_df.columns)
+final_df.columns = final_df.columns.fillna('to_drop')
+final_df.drop('to_drop', axis=1, inplace=True)
+# print(final_df)
 
 """
 # Age conversion to years from DOB
@@ -43,8 +60,12 @@ member_df['Age'] = member_df['DOB'].apply(age)
 """
 
 # Dependent And Dependent Plan Information
-dependent_df = df.iloc[indexes[4]:]
-# print(dependent_df)
+dependent_df = df.iloc[indexes[4]-1:]
+dependent_df = new_header(dependent_df)
+dependent_df.columns = dependent_df.columns.fillna('to_drop')
+dependent_df.drop('to_drop', axis=1, inplace=True)
+# dependent_df.columns = dependent_df.columns.droplevel(1)
+print(dependent_df.columns)
 
 """
 # Age conversion to years from DOB
