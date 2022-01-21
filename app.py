@@ -10,6 +10,7 @@ import re
 import os
 import codecs
 import io
+import openpyxl
 
 image = Image.open('assets/tp logo day.png')
 st.set_page_config(page_title='Ecolab COBRA',
