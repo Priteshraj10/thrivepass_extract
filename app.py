@@ -63,10 +63,40 @@ if uploaded_file is not None:
     plan = st.sidebar.multiselect('Select Plan Type:', options=final_df.PlanName.unique())
     desc = st.sidebar.multiselect('Select Plan Description:', options=final_df.StatusDesc.unique())
     carrier = st.sidebar.multiselect('Select Carrier:', options=final_df.CarrierName.unique())
+
+    # function pandas datatime
+    def pandas_datatime(df):
+        df['DOB'] = pd.to_datetime(df['DOB'], format='%Y-%m-%d')
+        return df
+
+    final_df = pandas_datatime(final_df)
+
+    # -----Sidebar Age Range slider-----
+    st.sidebar.header('Age Range')
+    age_range = st.sidebar.slider('Age Range', 0, 100, (0, 100))
+
+    # -----Sidebar Number of Days slider-----
+    st.sidebar.header('Number of Days')
+    days = st.sidebar.slider('Number of Days', 0, 100, (0, 100))
+
+    """
+
+    # Age conversion to years from DOB
+    def dep_age(date):
+        born = datetime.strptime(str(date), "%Y-%m-%d %H:%M:%S").date()
+        today = date.today()
+        sixty_days = today + timedelta(days=days)
+        return sixty_days.year - born.year - ((sixty_days.month, today.day) < (born.month, born.day))
+
+    final_df['Age'] = final_df['DOB'].apply(dep_age)
+    """
+
     final_df = final_df.query(
-        f"ClientDivisionName == @Program" or "CoverageLevelTypeDesc == @sp_info" or "StatusDesc == @desc" or "CarrierName == @carrier" or "PlanName == @plan")
+        f"ClientDivisionName == @Program" or "CoverageLevelTypeDesc == @sp_info" or "StatusDesc == @desc" or "CarrierName == @carrier" or
+        "PlanName == @plan" or "Age >= @age_range" or "Days >= @days")
     st.write(final_df)
 
+    """
     # -----Sidebar filter Plan Information-----
     st.sidebar.header('Dependent information')
     Plan_name = st.sidebar.multiselect('Select Plan Name:', options=dependent_df.PlanName.unique())
@@ -76,6 +106,7 @@ if uploaded_file is not None:
     dependent_df = dependent_df.query(f"PlanName == @Plan_name" or "InsuranceTypeName == @insur_type" or "StateOrProvince == @state" or "Country == @Country")
     st.sidebar.header('Dependent Information')
     st.write(dependent_df)
+    """
 
 """
   no_days = st.sidebar.radio(label='Radio buttons', options=['60 days before', '60 days after'])
@@ -175,7 +206,6 @@ def download_button(object_to_download, download_filename, button_text, pickle_i
     dl_link = custom_css + f'<a download="{download_filename}" id="{button_id}" href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}">{button_text}</a><br></br>'
 
     return dl_link
-
 
 hide_streamlit_style = """
 <style>
