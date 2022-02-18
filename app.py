@@ -2,12 +2,8 @@ import streamlit as st
 import pandas as pd
 from PIL import Image
 from datetime import datetime, date, timedelta
-import base64
-import json
-import pickle
-import uuid
-import re
-import io
+import os
+import csv
 
 image = Image.open('assets/tp logo day.png')
 st.set_page_config(page_title='Ecolab COBRA',
@@ -24,6 +20,11 @@ if uploaded_file is not None:
         df = df[1:]  # take the data less the header row
         df.columns = new_header  # set the header row as the df header
         return df
+
+    def check_age(date):
+        born = datetime.strptime(str(date), "%Y-%m-%d %H:%M:%S").date()
+        sixty_days = days_60 + timedelta(days=days_slider)
+        return sixty_days.year - born.year - ((sixty_days.month, days_60.day) < (born.month, born.day))
 
     df = new_header(df)
     # str contains method
@@ -48,6 +49,16 @@ if uploaded_file is not None:
     final_df.drop('to_drop', axis=1, inplace=True)
     final_df = final_df.astype(str)
 
+    # function pandas datatime
+    def pandas_datatime(df):
+        df['DOB'] = pd.to_datetime(df['DOB'], format='%Y-%m-%d')
+        return df
+
+
+    @st.cache
+    def convert_df(df):
+        return df.to_csv().encode('utf-8')
+
     # Dependent And Dependent Plan Information
     dependent_df = df.iloc[indexes[4] - 1:]
     dependent_df = new_header(dependent_df)
@@ -57,155 +68,123 @@ if uploaded_file is not None:
 
     # -----Sidebar filter Member Information-----
     st.sidebar.header('Please filter here:')
+
     st.sidebar.header('Member Information')
     Program = st.sidebar.multiselect('Select Benefit Program', options=final_df.ClientDivisionName.unique())
     sp_info = st.sidebar.multiselect('Select Coverage Level', options=final_df.CoverageLevelTypeDesc.unique())
-    plan = st.sidebar.multiselect('Select Plan Type:', options=final_df.PlanName.unique())
-    desc = st.sidebar.multiselect('Select Plan Description:', options=final_df.StatusDesc.unique())
+    desc = st.sidebar.multiselect('Select Plan Status:', options=final_df.StatusDesc.unique())
     carrier = st.sidebar.multiselect('Select Carrier:', options=final_df.CarrierName.unique())
+    insurance_type = st.sidebar.multiselect('Select Insurance Type:', options=final_df.InsuranceTypeDesc.unique())
+    relationship = st.sidebar.multiselect('Select Relationship:', options=dependent_df.Relationship.unique())
 
-    # function pandas datatime
-    def pandas_datatime(df):
-        df['DOB'] = pd.to_datetime(df['DOB'], format='%Y-%m-%d')
-        return df
 
     final_df = pandas_datatime(final_df)
 
-    # -----Sidebar Age Range slider-----
-    st.sidebar.header('Age Range')
-    age_range = st.sidebar.slider('Age Range', 0, 100, (0, 100))
-
     # -----Sidebar Number of Days slider-----
-    st.sidebar.header('Number of Days')
-    days = st.sidebar.slider('Number of Days', 0, 100, (0, 100))
+    st.sidebar.header('Filter By Member Age')
+    days_slider = st.sidebar.slider('Number of Days', -120, 120, 0)
+    days_slider = int(days_slider)
 
-    """
+    days_60 = date.today()
+    days_60_n = days_60 - timedelta(days=days_slider)
+    days_60_p = days_60 + timedelta(days=days_slider)
 
-    # Age conversion to years from DOB
-    def dep_age(date):
-        born = datetime.strptime(str(date), "%Y-%m-%d %H:%M:%S").date()
-        today = date.today()
-        sixty_days = today + timedelta(days=days)
-        return sixty_days.year - born.year - ((sixty_days.month, today.day) < (born.month, born.day))
+    # check if days slider is 0
+    if days_slider == 0 or days_slider == 0.0:
+        st.sidebar.write('Today date: {}'. format(days_60))
 
-    final_df['Age'] = final_df['DOB'].apply(dep_age)
-    """
+    elif days_slider > 0 and days_slider < 120:
+        st.sidebar.write('+120 days: {}'. format(days_60_p))
 
-    final_df = final_df.query(
-        f"ClientDivisionName == @Program" or "CoverageLevelTypeDesc == @sp_info" or "StatusDesc == @desc" or "CarrierName == @carrier" or
-        "PlanName == @plan" or "Age >= @age_range" or "Days >= @days")
+    elif days_slider < 0 and days_slider > -120:
+        st.sidebar.write('-120 days: {}'. format(days_60_n))
+
+
+    final_df['Age'] = final_df['DOB'].apply(check_age)
+
+    # -----Sidebar Age filter-----
+    age_slider = st.sidebar.slider('Age', 0, 100, 0)
+    age_slider = int(age_slider)
+
+    # check if age slider is 0
+    if age_slider == 0 or age_slider == 0.0:
+        st.sidebar.write('Age: {}'. format(age_slider))
+
+    elif age_slider > 0 and age_slider < 100:
+        st.sidebar.write('Age: {}'. format(age_slider))
+
+    # filter age based on the slider
+    age_df = final_df[final_df['Age'] == age_slider]
+
+    # function to filter by multiselect options and days slider and age slider
+    def filter_df(df, Program, sp_info, desc, carrier, insurance_type, age_slider):
+        if Program:
+            df = df[df['ClientDivisionName'].isin(Program)]
+        if sp_info:
+            df = df[df['CoverageLevelTypeDesc'].isin(sp_info)]
+        if desc:
+            df = df[df['StatusDesc'].isin(desc)]
+        if carrier:
+            df = df[df['CarrierName'].isin(carrier)]
+        if insurance_type:
+            df = df[df['InsuranceTypeDesc'].isin(insurance_type)]
+        if age_slider:
+            df = df[df['Age'] == age_slider]
+        return df
+
+    # unique member id
+    final_df = final_df.drop_duplicates(subset='MemberID')
+
+    final_df = filter_df(final_df, Program, sp_info, desc, carrier, insurance_type, age_slider)
+    st.markdown('### Member Information')
     st.write(final_df)
+    final_csv = convert_df(final_df)
+    st.download_button("Download Member Informaion", final_csv, "Member.csv", "text/csv", key='download-csv')
 
-    """
-    # -----Sidebar filter Plan Information-----
-    st.sidebar.header('Dependent information')
-    Plan_name = st.sidebar.multiselect('Select Plan Name:', options=dependent_df.PlanName.unique())
-    insur_type = st.sidebar.multiselect('Select Insurance Type:', options=dependent_df.InsuranceTypeName.unique())
-    state = st.sidebar.multiselect('Select State:', options=dependent_df.StateOrProvince.unique())
-    Country = st.sidebar.multiselect('Select County:', options=dependent_df.Country.unique())
-    dependent_df = dependent_df.query(f"PlanName == @Plan_name" or "InsuranceTypeName == @insur_type" or "StateOrProvince == @state" or "Country == @Country")
-    st.sidebar.header('Dependent Information')
+    # ----Dependent Information----
+
+    # Age in dependent_df
+    dependent_df['Age'] = dependent_df['DOB'].apply(check_age)
+    st.sidebar.header('Filter By Dependent Age')
+
+    # -----Sidebar Age filter-----
+    dep_age_slider = st.sidebar.slider('Dependent Age', 0, 100, 0)
+    dep_age_slider = int(dep_age_slider)
+
+    # check if age slider is 0
+    if dep_age_slider == 0 or dep_age_slider == 0.0:
+        st.sidebar.write('Age: {}'. format(dep_age_slider))
+
+    elif dep_age_slider > 0 and dep_age_slider < 100:
+        st.sidebar.write('Age: {}'. format(dep_age_slider))
+
+    # filter age based on the slider
+    dependent_df = dependent_df[dependent_df['Age'] == dep_age_slider]
+
+    def filter_dependent(df, relationship, dep_age_slider):
+        if relationship:
+            df = df[df['Relationship'].isin(relationship)]
+        if dep_age_slider:
+            df = df[df['Age'] == dep_age_slider]
+        return df
+
+    dependent_df = filter_dependent(dependent_df, relationship, dep_age_slider)
+
+    # filter same member id in dependent df
+    dependent_df = dependent_df[dependent_df['MemberID'].isin(final_df['MemberID'])]
+
+    st.markdown('### Dependent Information')
     st.write(dependent_df)
-    """
+    dependent_csv = convert_df(dependent_df)
+    st.download_button("Download Dependent Information", dependent_csv, "Dependent.csv", "text/csv", key='download-csv')
 
-"""
-  no_days = st.sidebar.radio(label='Radio buttons', options=['60 days before', '60 days after'])
+    # -----End of COBRA----
+    st.sidebar.header('End of Continuation')
 
-  if no_days == '60 days before':
-      final_df['DOB'] = final_df['DOB'].apply(lambda x: x - timedelta(days=60))
-  elif no_days == '60 days after':
-      final_df['DOB'] = final_df['DOB' \
-                                 ''].apply(lambda x: x + timedelta(days=60))
-
-      
-  days_before = (date.today()-timedelta(days=60)).isoformat()
-  days_after = (date.today()+timedelta(days=60)).isoformat()
-  
-  # Age_data = final_df[final_df['Age'] > a.year]
-
-  final_df = final_df.query(f"ClientDivisionName == @Program" and "CoverageLevelTypeDesc == @sp_info" and "StatusDesc == @desc")
-
-  # ---- MAIN PAGE ----
-  st.header("Ecolab")
-  st.write(final_df)
-
-"""
-
-def age(born):
-    born = datetime.strptime(str(born), "%Y-%m-%d %H-%m-%s").date()
-    today = date.today()
-    return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
-
-
-# 65th birthday
-def addYears(d, years):
-    year=d.year+years
-    return year
-
-
-def download_button(object_to_download, download_filename, button_text, pickle_it=False):
-    if pickle_it:
-        try:
-            object_to_download = pickle.dumps(object_to_download)
-        except pickle.PicklingError as e:
-            st.write(e)
-            return None
-
-    else:
-        if isinstance(object_to_download, bytes):
-            pass
-
-        elif isinstance(object_to_download, pd.DataFrame):
-            #object_to_download = object_to_download.to_csv(index=False)
-            towrite = io.BytesIO()
-            object_to_download = object_to_download.to_excel(towrite, encoding='utf-8', index=False, header=True)
-            towrite.seek(0)
-
-        # Try JSON encode for everything else
-        else:
-            object_to_download = json.dumps(object_to_download)
-
-    try:
-        # some strings <-> bytes conversions necessary here
-        b64 = base64.b64encode(object_to_download.encode()).decode()
-
-    except AttributeError as e:
-        b64 = base64.b64encode(towrite.read()).decode()
-
-    button_uuid = str(uuid.uuid4()).replace('-', '')
-    button_id = re.sub('\d+', '', button_uuid)
-
-    custom_css = f""" 
-        <style>
-            #{button_id} {{
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                background-color: rgb(255, 255, 255);
-                color: rgb(38, 39, 48);
-                padding: .25rem .75rem;
-                position: relative;
-                text-decoration: none;
-                border-radius: 4px;
-                border-width: 1px;
-                border-style: solid;
-                border-color: rgb(230, 234, 241);
-                border-image: initial;
-            }} 
-            #{button_id}:hover {{
-                border-color: rgb(246, 51, 102);
-                color: rgb(246, 51, 102);
-            }}
-            #{button_id}:active {{
-                box-shadow: none;
-                background-color: rgb(246, 51, 102);
-                color: white;
-                }}
-        </style> """
-
-    dl_link = custom_css + f'<a download="{download_filename}" id="{button_id}" href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}">{button_text}</a><br></br>'
-
-    return dl_link
+    def pandas_datetime(df):
+        df['OriginalLastDayOfCobra'] = pd.to_datetime(df['OriginalLastDayOfCobra'], format='%Y-%m-%d')
+        return df
+    final_df = pandas_datetime(final_df)
 
 hide_streamlit_style = """
 <style>
@@ -214,3 +193,5 @@ footer {visibility: hidden;}
 </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+

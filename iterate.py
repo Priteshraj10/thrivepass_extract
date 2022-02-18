@@ -3,6 +3,9 @@ import openpyxl
 from datetime import datetime, date, timedelta
 
 df = pd.read_excel('data/orignal_testing_data/QB Summary 2021.11.10 raw-test.xlsx')
+# convert data into json format
+df.to_json('data/orignal_testing_data/QB Summary 2021.11.10 raw-test.json', orient='records')
+
 """
 # new header for the dataframe
 new_header = df.iloc[0] #grab the first row for the header
@@ -53,11 +56,10 @@ def pandas_datatime(df):
     df['DOB'] = pd.to_datetime(df['DOB'],format='%Y-%m-%d')
     return df
 
-
 final_df = pandas_datatime(final_df)
 
-input_user = 60
-
+# datetime64 for today date
+"""
 # Age conversion to years from DOB
 def dep_age(date):
     born = datetime.strptime(str(date), "%Y-%m-%d %H:%M:%S").date()
@@ -67,7 +69,7 @@ def dep_age(date):
 
 final_df['Age'] = final_df['DOB'].apply(dep_age)
 
-"""
+
 # 60 days from today
 def sixty_days(date):
     today = date.today()
@@ -75,27 +77,98 @@ def sixty_days(date):
     return sixty_days
 """
 
-# filter 60 age from the dataframe
-final_df = final_df[final_df['Age'] >= input_user]
-print(final_df['Age'])
+import streamlit as st
 
-"""
-# Age conversion to years from DOB
-def age(born):
-    born = datetime.strptime(str(born), "%Y-%m-%d %H:%M:%S").date()
+# -----Sidebar Number of Days slider-----
+st.sidebar.header('Number of Days')
+days_slider = st.sidebar.slider('Number of Days', -60, 60, 0)
+days_slider = int(days_slider)
+
+days_60 = date.today()
+days_60_n = days_60 - timedelta(days=days_slider)
+days_60_p = days_60 + timedelta(days=days_slider)
+
+# check if days slider is 0
+if days_slider == 0 or days_slider == 0.0:
+    st.sidebar.write('Today date: {}'. format(days_60))
+
+elif days_slider > 0 and days_slider < 60:
+    st.sidebar.write('+60 days: {}'. format(days_60_p))
+
+elif days_slider < 0 and days_slider > -60:
+    st.sidebar.write('-60 days: {}'. format(days_60_n))
+
+# check 65 years age from DOB
+def check_age(date):
+    born = datetime.strptime(str(date), "%Y-%m-%d").date()
     today = date.today()
-    return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+    sixty_days = today + timedelta(days=days_slider)
+    return sixty_days.year - born.year - ((sixty_days.month, today.day) < (born.month, born.day))
 
-# DOB to age conversion
-member_df['Age'] = member_df['DOB'].apply(age)
+final_df['Age'] = final_df['DOB'].apply(check_age)
+
+
+# print(final_df['Age'])
+
+# # change format of days_60_p and days_60_n
+# days_60_p = days_60_p.strftime('%Y-%m-%d')
+# days_60_n = days_60_n.strftime('%Y-%m-%d')
+# days_60 = days_60.strftime('%Y-%m-%d')
+
+# get age from current_age days_60_p, days_60_n, days_60
+# print(final_df['Age'])
+# # Get age from the slider_days and subtract from current age
+# def age_from_slider(date, days_slider):
+#     born = datetime.strptime(str(date), "%Y-%m-%d %H:%M:%S").date()
+#     today = date.today()
+#     sixty_days = today + timedelta(days=days_slider)
+#     return sixty_days.year - born.year - ((sixty_days.month, today.day) < (born.month, born.day))
+#
+# final_df['age_from_slider'] = final_df['DOB'].apply(age_from_slider, args=(days_slider,))
+#
+# print(final_df['age_from_slider'])
+
+# # find age from the days_slider value and DOB
+# def dep_age(date):
+#     born = datetime.strptime(str(date), "%Y-%m-%d %H:%M:%S").date()
+#     today = date.today()
+#     sixty_days = today + timedelta(days=days_slider)
+#     return sixty_days.year - born.year - ((sixty_days.month, today.day) < (born.month, born.day))
+#
+# final_df['Age'] = final_df['DOB'].apply(dep_age)
+
+
+
 """
+# current age minus input into slider
+def age_calc(date):
+    today = date.today()
+    sixty_days = today + timedelta(days=days_val)
+    return sixty_days
+
+final_df['New_Age'] = final_df['Age'].apply(age_calc)
+
+
+# Age conversion to years from DOB
+def dep_age(date):
+    born = datetime.strptime(str(date), "%Y-%m-%d %H:%M:%S").date()
+    today = date.today()
+    sixty_days = today + timedelta(days=days_val)
+    return sixty_days.year - born.year - ((sixty_days.month, today.day) < (born.month, born.day))
+
+
+final_df['Age'] = final_df['DOB'].apply(dep_age)
+"""
+
 
 # Dependent And Dependent Plan Information
 dependent_df = df.iloc[indexes[4]-1:]
 dependent_df = new_header(dependent_df)
 dependent_df.columns = dependent_df.columns.fillna('to_drop')
 dependent_df.drop('to_drop', axis=1, inplace=True)
-dependent_df.drop('MemberID', axis=1, inplace=True)
+# dependent_df.drop('MemberID', axis=1, inplace=True)
+
+print(dependent_df.columns)
 
 # dependent_df = pandas_datatime(dependent_df)
 
@@ -104,8 +177,8 @@ dependent_df.drop('MemberID', axis=1, inplace=True)
 # dependent_df['Dep_Age'] = dependent_df['DOB'].apply(dep_age)
 
 # pd.DataFrame.to_excel(data_plan, 'data/orignal_testing_data/plan_df_slice.xlsx', header=None)
-"""
+
 # merge the two dataframes with member id
-final_df = pd.merge(plan_df, member_df, on='MemberID', suffixes=('', '_delme'))
-final_df = final_df[[c for c in final_df.columns if not c.endswith('_delme')]]
-"""
+# final_df = pd.merge(plan_df, member_df, on='MemberID', suffixes=('', '_delme'))
+# final_df = final_df[[c for c in final_df.columns if not c.endswith('_delme')]]
+
