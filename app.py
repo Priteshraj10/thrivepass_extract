@@ -52,6 +52,7 @@ if uploaded_file is not None:
     # function pandas datatime
     def pandas_datatime(df):
         df['DOB'] = pd.to_datetime(df['DOB'], format='%Y-%m-%d')
+        df['OriginalLastDayOfCobra'] = pd.to_datetime(df['OriginalLastDayOfCobra'], format='%Y-%m-%d')
         return df
 
 
@@ -88,6 +89,9 @@ if uploaded_file is not None:
     days_60 = date.today()
     days_60_n = days_60 - timedelta(days=days_slider)
     days_60_p = days_60 + timedelta(days=days_slider)
+
+    # filter by end of continuation through days slider
+    end_of_cont_df = final_df[final_df['OriginalLastDayOfCobra'] == days_slider]
 
     # check if days slider is 0
     if days_slider == 0 or days_slider == 0.0:
@@ -136,16 +140,21 @@ if uploaded_file is not None:
     final_df = final_df.drop_duplicates(subset='MemberID')
 
     final_df = filter_df(final_df, Program, sp_info, desc, carrier, insurance_type, age_slider)
+
     st.markdown('### Member Information')
     st.write(final_df)
+
+    #st.subheader("End of Continuation")
+    #st.write(final_df[final_df['OriginalLastDayOfCobra'] == days_slider])
+
     final_csv = convert_df(final_df)
-    st.download_button("Download Member Informaion", final_csv, "Member.csv", "text/csv", key='download-csv')
+    st.download_button("Download Member Information", final_csv, "Member.csv", "text/csv", key='download-csv')
 
     # ----Dependent Information----
 
     # Age in dependent_df
     dependent_df['Age'] = dependent_df['DOB'].apply(check_age)
-    st.sidebar.header('Filter By Dependent Age')
+    st.sidebar.subheader('Filter By Dependent Record')
 
     # -----Sidebar Age filter-----
     dep_age_slider = st.sidebar.slider('Dependent Age', 0, 100, 0)
@@ -181,10 +190,9 @@ if uploaded_file is not None:
     # -----End of COBRA----
     st.sidebar.header('End of Continuation')
 
-    def pandas_datetime(df):
-        df['OriginalLastDayOfCobra'] = pd.to_datetime(df['OriginalLastDayOfCobra'], format='%Y-%m-%d')
-        return df
-    final_df = pandas_datetime(final_df)
+
+
+
 
 hide_streamlit_style = """
 <style>

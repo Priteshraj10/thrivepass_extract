@@ -54,6 +54,7 @@ final_df.drop('to_drop', axis=1, inplace=True)
 # function pandas datatime
 def pandas_datatime(df):
     df['DOB'] = pd.to_datetime(df['DOB'],format='%Y-%m-%d')
+    df['OriginalLastDayOfCobra'] = pd.to_datetime(df['OriginalLastDayOfCobra'], format='%Y-%m-%d')
     return df
 
 final_df = pandas_datatime(final_df)
